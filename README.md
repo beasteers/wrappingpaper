@@ -4,6 +4,7 @@ A collection of Python decorators and utilities to abstract away common/tedious 
 
 For example:
 ```python
+import wrappingpaper as wp
 
 @wp.contextdecorator
 def doing_something(a, b):
