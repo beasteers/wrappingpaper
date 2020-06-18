@@ -151,7 +151,7 @@ class SomeClass:
         object itself.'''
         return time.time()
 
-    @wp.overrideable_property
+    @wp.overridable_property
     def overridable(self):
         return time.time()
 

@@ -127,7 +127,7 @@ def test_props():
         def y(self):
             return time.time()
 
-        @wp.overrideable_property
+        @wp.overridable_property
         def z(self):
             return time.time()
 

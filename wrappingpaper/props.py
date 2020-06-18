@@ -26,7 +26,7 @@ class onceproperty:
             self.value = self.func(obj)
         return self.value
 
-class overrideable_property:
+class overridable_property:
     def __init__(self, func):
         self.name = getattr(func, '__name__', None) or 'func{}'.format(id(func))
         self.__doc__ = (
