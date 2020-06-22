@@ -8,19 +8,20 @@ from inspect import Parameter as Pm
 POSARG_TYPES = [Pm.POSITIONAL_ONLY, Pm.POSITIONAL_OR_KEYWORD]
 ARG_TYPES = POSARG_TYPES + [Pm.KEYWORD_ONLY]
 
-Spec = collections.namedtuple('Spec', 'args, vararg, varkw, posargs, kwargs, defaults')
+Spec = collections.namedtuple('Spec', 'args, vararg, varkw, posargs, kwargs, posonlyargs, defaults')
 
 def get_argspec(f):
     '''Get function parameters'''
     ps = inspect.signature(f).parameters.items()
     args = [n for n, p in ps if p.kind in ARG_TYPES]
     defaults = {n: p.default for n, p in ps if p.kind in ARG_TYPES}
-    posargs = [n for n, p in ps if p.kind in POSARG_TYPES and
-               p.default == inspect._empty]
+    posargs = [n for n, p in ps if p.kind in POSARG_TYPES]
+    posonlyargs = [n for n, p in ps if p.kind in POSARG_TYPES and
+                   p.default == inspect._empty]
     vararg = next((n for n, p in ps if p.kind == Pm.VAR_POSITIONAL), None)
     varkw = next((n for n, p in ps if p.kind == Pm.VAR_KEYWORD), None)
     kwargs = {n: p.default for n, p in ps if p.default != inspect._empty}
-    return Spec(args, vararg, varkw, posargs, kwargs, defaults)
+    return Spec(args, vararg, varkw, posargs, kwargs, posonlyargs, defaults)
 
 
 def filterkw(func):
@@ -34,6 +35,42 @@ def filterkw(func):
     def inner(*a, **kw):
         return func(*a, **{k: v for k, v in kw.items() if k in args})
     return inner
+
+def filterpos(func):
+    '''Remove arguments that aren't in the function signature.'''
+    spec = get_argspec(func)
+    print(spec)
+    if spec.vararg:
+        return func
+
+    @functools.wraps(func)
+    def inner(*a, **kw):
+        return func(*a[:len(spec.posargs)], **kw)
+    return inner
+
+
+def partial(func, *a, **kw):
+    '''Partial argument binding - maintaining the function signature.'''
+    @functools.wraps(func)
+    def inner(*ai, **kwi):
+        return func(*a, *ai, **kw, **kwi)
+    return inner
+
+
+def args(*a, **kw):
+    def arguments(func):
+        return partial(func, *a, **kw)
+    arguments.__doc__ = '''
+    Arguments containing:
+        *args: {}
+        **kwargs: {}
+
+    Call this function to bind arguments to a function.
+    '''.format(a, kw)
+
+    arguments.args = a
+    arguments.kwargs = kw
+    return arguments
 
 
 class configfunction:
@@ -51,7 +88,8 @@ class configfunction:
     '''
     def __init__(self, func, fill_varkw=True, view=None):
         self.function = func
-        (self.spec) = get_argspec(func)
+        self.name = func.__name__
+        self.spec = get_argspec(func)
         functools.update_wrapper(self, func)
 
         self.config = {}

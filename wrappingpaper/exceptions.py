@@ -1,0 +1,2 @@
+class CircularReference(Exception):
+    pass

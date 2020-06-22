@@ -1,5 +1,6 @@
-from functools import wraps
+import functools
 import contextlib
+import wrappingpaper as wp
 
 
 def contextdecorator(func):
@@ -24,39 +25,62 @@ def contextdecorator(func):
             print(1)
         # prints 4, 1, 5
     '''
-    @wraps(func)
+    @functools.wraps(func)
     def inner(*a, **kw):
         cm = _ContextDecorator(func, *a, **kw)
-        cm.wrapper = inner.wrapper
+        cm.caller = inner._caller
         return cm
-    inner.wrap = setter(inner, 'wrapper')
+    inner.caller = _setter(inner, '_caller')
     return inner
 
 
-def setter(obj, attr, default=None):
+def _setter(obj, attr, default=None):
     def inner(value):
         setattr(obj, attr, value)
+        return obj
     inner(default)
     return inner
 
 
+class returngen(object):
+    value = wp.EMPTY
+    def __init__(self, g, default=None):
+        self.g = g
+        self.value = default
+
+    def __iter__(self):
+        self.value = yield from self.g
+
+
 class _ContextDecorator(contextlib._GeneratorContextManager):
     '''Helper for @contextdecorator decorator.'''
-    wrapper = None
+    caller = None
+    _gen = gen = None
     def __init__(self, func, *a, **kw):
         self.func, self.a, self.kw = func, a, kw
-        self.__doc__ = getattr(func, "__doc__", None) or type(self).__doc__
+        functools.update_wrapper(self, func)
+
+    @property
+    def default_value(self):
+        if self._gen and self._gen.value is not wp.EMPTY:
+            return self._gen.value
 
     def __enter__(self):
-        self.gen = self.func(*self.a, **self.kw)
+        self._gen = returngen(self.func(*self.a, **self.kw), wp.EMPTY)
+        self.gen = iter(self._gen)
         try:
             return next(self.gen)
         except StopIteration:
             raise RuntimeError("generator didn't yield") from None
 
     def __call__(self, func):
-        @wraps(func)
-        def inner(*a, **kw):
+        print(456456, func, self.caller)
+        if callable(self.caller):
+            return self.caller(func, *self.a, **self.kw)
+
+        @functools.wraps(self.func)
+        def wrapper(*a, **kw):
             with self:
                 return func(*a, **kw)
-        return self.wrapper(inner) if callable(self.wrapper) else inner
+            return self.default_value
+        return wrapper

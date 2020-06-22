@@ -17,12 +17,14 @@ def doing_something(a, b):
 # you can do this
 with doing_something(4, 5):
     print(1)
+# prints 4 1 5
 
 # as well as this
 @doing_something(4, 5)
 def something():
     print(1)
 something()
+# prints 4 1 5
 
 ```
 
@@ -81,6 +83,12 @@ def get_stats(x=None):
 
 ### Context Managers
 
+Two common patterns in Python are context managers and decorators. Often, they have the same basic structure: do some initialization, run a function, and do some cleanup.
+
+And both can be useful in different contexts to give you clean code, but to use both, I often find myself writing an additional wrapper function around the context manager, and then you have to give it a slightly different name and it can get confusing.
+
+So, in comes `contextdecorator` which works the same as `contextlib.contextmanager`, but it also doubles as a function decorator. When used as a decorator, it will call the function inside the context manager.
+
 ```python
 
 @wp.contextdecorator
@@ -100,6 +108,26 @@ with doing_something(4, 5):
 def something():
     print(1)
 something()
+
+```
+
+Sometimes, your decorator isn't as simple and you need to do things a bit differently in the decorator (e.g. you need the name of the wrapped function).
+
+```python
+
+@doing_something.caller # override default decorator
+def doing_something(func, a, b): # wrapped function, decorator arguments
+    # change arguments
+    name = func.__name__
+    a = 'calling {}: {}'.format(name, a)
+    b = 'calling {}: {}'.format(name, b)
+
+    # return the wrapped function
+    @functools.wraps(func)
+    def inner(*args, **kw):
+        with doing_something(a, b):
+            return func(*args, **kw)
+    return inner
 
 ```
 
@@ -136,6 +164,16 @@ something()
 ```
 
 ### Properties
+
+Python property objects are incredibly useful as they allow you to create natural feeling objects with some complex stuff all bundled up in a nice unsuspecting interface.
+
+But using them, there are often times where I find myself writing the same classes stored many times over in utility files.
+
+One use-case is caching. There are different levels of caching that you can provide.
+ - `cachedproperty`: cached on the instance object - runs once per instance
+ - `onceproperty`: cached on the class object - runs once per class/baseclass
+ - `overridable_property`: works as a normal property (calls the wrapped function), until the property is assigned to. Then it returns the assigned value.
+ - `overridable_method`: works as a normal method (calls the wrapped function), until the function is called as a decorator. Then it calls the wrapped function. Works on an instance level.
 
 ```python
 import time
@@ -175,6 +213,17 @@ assert SomeClass(5).overridable == 5 # overriding inside class
 ```
 
 ### Function Signature
+
+This is something that I'm looking for constantly.
+
+Personally, I like the idea of config files that wrap up a bunch of function arguments into a file.
+
+I also hate having to duplicate arguments when passing variables down 5 levels of nested function calls.
+
+I like to just pass keyword arguments (`**kw`) down to the next function.
+
+But there are cases, where there are extra config values in your keyword dict and you only want to pass the values that your function takes.
+
 
 ```python
 # dynamic function defaults
