@@ -2,7 +2,19 @@
 
 A collection of Python decorators and utilities to abstract away common/tedious Python patterns.
 
-For example:
+#### Notes
+
+This package is more about providing interesting abstractions and trying to flesh out the possibilities of Python code organization. I am in no way saying that using these functions will provide "good" code and I am in no way condoning their use for creating evil Python code ;).
+
+Some of the functions in here may incentivize less understandable code, but that's okay. I want to give them space to exist and hopefully we can develop them further to where they will be more understandable and provide more intuitive abstractions.
+
+This package is about experimentation and trying to create basic, interesting, natural feeling, and convenient abstractions while sidelining the scrutiny of stuck-up Python purists :stuck_out_tongue_closed_eyes:.
+
+So, I guess the motto of this package is to develop freely, but use responsibly. <3
+
+One other thing to note though, some of these don't play nice with linters 😢
+
+#### Example
 ```python
 import wrappingpaper as wp
 
@@ -33,9 +45,10 @@ something()
     - catch errors thrown in a function and redirect to logger
  - [context managers](#context-managers)
    - context managers that double as function wrappers
- - [iterable utils](#iterables)
- - [object property patterns](#properties)
- - [function default manipulation](#function-signature)
+ - [iterables](#iterables)
+ - [object properties](#properties)
+ - [function signature helpers](#function-signature)
+ - [import mechanics](#import-mechanics)
  - [misc](#misc)
 
 
@@ -51,6 +64,16 @@ import wrappingpaper as wp
 ```
 
 ### Logging
+
+**NOTE: I haven't put in the work to mock logging objects for testing so beware that in their current form they are untested and most likely have 1 or 2 bugs in there.**
+
+I was working on a project that was full of error suppression and logging. There would be functions wrapped in try except blocks, logging calls, and a lot of redundancy in the scaffolding needed.
+
+So I did work to factor that out and perform many of the common patterns in decorators.
+
+The logging decorators here are primarily for functions that can be permitted to fail and return a default/empty value without the rest of the program breaking.
+
+It also has utilities for pulling information from tracebacks. I haven't done anything about the logging Handlers and Formatters so that's a TODO.
 
 ```python
 import logging
@@ -192,6 +215,7 @@ class SomeClass:
 
     @wp.overridable_property
     def overridable(self):
+        '''This property is run normally, until another value is assigned on top.'''
         return time.time()
 
     def __init__(self, overridable=None):
@@ -245,7 +269,29 @@ assert asdf() == 5+6+7 # back to normal behavior
 def asdf(a=5, b=6, c=7):
     return a + b + c
 
-assert asdf(d=1234) == 5+6+7
+assert asdf(b=10, d=1234) == 5+10+7
+
+```
+
+## Objects
+
+```python
+
+class Blah:
+    def asdf(self):
+        return 10
+
+b = Blah()
+
+@wp.monkeypatch(b)
+def asdf():
+    return 11
+
+assert asdf() == 11
+asdf.reset() # remove patch
+assert asdf() == 10
+asdf.repatch() # re-place the patch
+assert asdf() == 11
 
 ```
 
@@ -284,6 +330,10 @@ numbers = wp.run_iter_forever(get_numbers)
 all_numbers = list(wp.limit(numbers, 100))
 assert all(isinstance(x, float) for x in all_numbers)
 
+# repeat and chain infinitely. If no items are returned by a call,
+# instead of the iterable hanging indefinitely waiting for an item,
+# return None.
+
 def get_numbers():
     if random.random() > 0.8: # make random breaks
         return # returns empty
@@ -293,9 +343,44 @@ numbers = wp.run_iter_forever(get_numbers, none_if_empty=True)
 # this SHOULD contain sporadic None's at a multiple of 10
 all_numbers = list(wp.limit(numbers, 5000))
 assert None in all_numbers
+
+
+# A wrappable alternative to `while True:`
+
+for _ in wp.infinite():
+    print('this is gonna be a while...')
+
 ```
 
+## Import Mechanics
+
+This is probably the most dangerous thing to be playing with in here.
+
+Python exposes a lot of its internal mechanics including its import system.
+
+So we can take advantage of that to provide import wrappers that modify module behavior.
+
+A basic example - lazy loading:
+
+```python
+# lazyimport/__init__.py
+import wrappingpaper as wp
+wp.lazy_loader.activate(__name__)
+
+
+# main.py
+from lazyimport import sklearn.model_selection
+
+# sklearn is not currently loaded
+
+sklearn.model_selection.train_test_split() # now it's loaded.
+```
+
+I'll try to think up another simple example with the actual implementation shown.
+
 ## Misc
+
+Some other miscellaneous stuff that I have yet to organize.
 
 ```python
 import random
@@ -324,11 +409,5 @@ with wp.ignore():
     c = a / b # throws divide by zero
     a = 10 # never run
 assert a == 5
-
-
-# A wrappable alternative to `while True:`
-
-for _ in wp.infinite():
-    print('this is gonna be a while...')
 
 ```
