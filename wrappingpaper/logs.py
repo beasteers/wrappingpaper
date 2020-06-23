@@ -4,6 +4,10 @@ from functools import wraps
 from .context import contextdecorator
 
 
+class _Ignore(Exception):
+    pass
+
+
 def log_error_as_warning(logger, *a, **kw):
     '''Instead of throwing an error, log as a warning.'''
     return handle_error(logger.warning, *a, **kw)
@@ -23,7 +27,7 @@ def ignore_error(ignore=(Exception,), **kw):
 
 @contextdecorator
 def handle_error(log, msg='Exception:', should_raise=False, exc=(Exception,),
-                 log_traceback=False, ignore=(), exit=False,
+                 log_traceback=False, ignore=_Ignore, exit=False,
                  default=None):
     '''Catch errors thrown within context manager.
 
@@ -39,7 +43,7 @@ def handle_error(log, msg='Exception:', should_raise=False, exc=(Exception,),
     '''
     try:
         yield
-    except ignore:
+    except ignore or _Ignore:
         pass
     except exc as e:
         # TODO: any way to pass exception and use that as a trace? idk this is FINE for now
