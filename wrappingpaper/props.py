@@ -24,6 +24,7 @@ class cachedproperty:
 
 
 class onceproperty:
+    '''A property that is only run once. The value is cached on the class object.'''
     def __init__(self, func):
         self.__doc__ = getattr(func, '__doc__')
         self.func = func
@@ -40,6 +41,7 @@ class onceproperty:
 
 
 class overridable_property:
+    '''A property that works like a normal property, but can be overridden.'''
     def __init__(self, func):
         self.name = getattr(func, '__name__', None) or 'func{}'.format(id(func))
         self.__doc__ = (
@@ -71,27 +73,34 @@ class classinstancemethod:
         return self.func.__get__(owner if instance is None else instance)
 
 
-class _propobject:
+class propobject:
     '''A property that can have it's own methods with access to
     instance and owner.'''
-    def __init__(self, func, instance=None, owner=None):
+    def __init__(self, func=None, instance=None, owner=None):
         self.func, self.instance, self.owner = func, instance, owner
-        functools.update_wrapper(self, func)
+        if callable(func):
+            functools.update_wrapper(self, func)
 
     @property
     def target(self):
         return (
             self.instance if self.instance is not None else
-            self.owner if self.owner is not None else self.func)
+            self.owner if self.owner is not None else
+            self.func if self.func is not None else self)
+
+    @property
+    def method(self):
+        return self.func.__get__(self.target)
 
     def __get__(self, instance, owner=None):
         return wp.copyobject(self, instance=instance, owner=owner)
 
     def __call__(self, *a, **kw):
-        return self.func(self.target, *a, **kw)
+        if callable(self.func):
+            return self.method(*a, **kw)
 
 
-class overridable_method(_propobject):
+class overridable_method(propobject):
     '''
     class A:
         on_call = wp.instancedef('_on_call')

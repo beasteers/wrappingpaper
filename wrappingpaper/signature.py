@@ -92,7 +92,7 @@ class configfunction:
         self.spec = get_argspec(func)
         functools.update_wrapper(self, func)
 
-        self.config = {}
+        self.config = collections.ChainMap()
         self.fill_varkw = fill_varkw
 
     def __call__(self, *a, _cfg=None, **kw):
@@ -117,6 +117,16 @@ class configfunction:
 
     def update(self, *a, **kw):
         self.config.update(*a, **kw)
+        return self
+
+    def add(self, *cfg):
+        for d in cfg:
+            self.config.maps.append(d)
+        return self
+
+    def set(self, cfg):
+        for d in cfg[::-1]:
+            self.config.maps.insert(0, d)
         return self
 
     def clear(self, *a):

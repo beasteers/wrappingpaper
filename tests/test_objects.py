@@ -88,3 +88,53 @@ def test_copyobject():
     x.z = 7
     with pytest.raises(AttributeError):
         assert x.z != a.z
+
+def test_monkeypatch():
+    class A:
+        def x(self):
+            return 5
+
+    a = A()
+    b = A()
+    assert a.x() == 5 and b.x() == 5
+
+    @wp.monkeypatch(a)
+    def x():
+        return 7
+
+    c = A()
+    assert a.x() == 7 and b.x() == 5 and c.x() == 5
+
+    a.x.reset()
+    @wp.monkeypatch(a)
+    def x():
+        return x.super() + 7
+    assert a.x() == 5+7
+
+    a.x.reset()
+    @wp.monkeypatch(a)
+    def x():
+        x.reset()
+        assert a.x != x
+        x.repatch()
+        assert a.x == x
+        return x.super() + 7
+    assert a.x() == 5+7
+
+
+def test_modfuncglobals():
+    def asdf():
+        return xxxx
+    asdf1 = wp.modfuncglobals(asdf, {'xxxx': 5})
+    assert asdf1() == 5
+    with pytest.raises(NameError):
+        asdf()
+
+    asdf1 = wp.modfuncglobals(asdf, xxxx=10)
+    assert asdf1() == 10
+
+    asdf1 = wp.modfuncglobals(asdf, {'xxxx': 5}, xxxx=10)
+    assert asdf1() == 10
+
+    asdf1 = wp.modfuncglobals(asdf, {'xxxx': 10}, {'xxxx': 5})
+    assert asdf1() == 10

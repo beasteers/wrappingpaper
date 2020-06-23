@@ -31,6 +31,51 @@ def copyobject(obj, **kw):
     return new
 
 
+def monkeypatch(obj, name=None, prefix='_monkey_patched_'):
+    def inner(func, name=name):
+        name = name or func.__name__
+
+        # get the old function and save on new object
+        func.super = oldfunc = getattr(obj, name, None)
+        if oldfunc is not None:
+            setattr(obj, prefix + name, func)
+        # patch in new function
+        setattr(obj, name, func)
+
+        # add method to reset function
+        def reset():
+            setattr(obj, name, oldfunc)
+            return func
+        func.reset = reset
+
+        def repatch():
+            setattr(obj, name, func)
+            return func
+        func.repatch = repatch
+        return func
+    return inner
+
+
+def modfuncglobals(func, *ds, **kw):
+    '''Add globals to a function.'''
+    dp = dictproxy()
+    newfunc = FunctionType(func.__code__, dictproxy(dp, func.__globals__))
+    newfunc.__name__ = func.__name__
+    newfunc.__doc__ = func.__doc__
+    newfunc.__defaults__ = func.__defaults__
+    newfunc.__kwdefaults__ = func.__kwdefaults__
+    newfunc.__scopes__ = dp.maps
+    def add(*ds, **kw):
+        for d in ds[::-1]:
+            newfunc.__scopes__.insert(0, d)
+        if kw:
+            newfunc.add(kw)
+        return newfunc
+    newfunc.add = add
+    newfunc.add(*ds, **kw)
+    return newfunc
+
+
 class namespace(type):
     '''A python module, defined like a class.
     Source: http://code.activestate.com/recipes/578279-using-chainmap-for-embedded-namespaces/
@@ -44,20 +89,10 @@ class namespace(type):
 
     >>> assert something.blah() == 10+11
     '''
-    def __new__(cls, name, bases, dict):
-        mod = ModuleType(name, dict.get("__doc__"))
-        for key, obj in dict.items():
+    def __new__(cls, name, bases, dct):
+        mod = ModuleType(name, dct.get("__doc__"))
+        for key, obj in dct.items():
             if isinstance(obj, FunctionType):
-                obj = cls.scoped_function(cls, obj, mod.__dict__)
+                obj = modfuncglobals(obj, mod.__dict__)
             mod.__dict__[key] = obj
         return mod
-
-    def scoped_function(cls, func, d):
-        d = dictproxy(d, func.__globals__)
-        newfunc = FunctionType(func.__code__, d)
-        newfunc.__name__ = func.__name__
-        newfunc.__doc__ = func.__doc__
-        newfunc.__defaults__ = func.__defaults__
-        newfunc.__kwdefaults__ = func.__kwdefaults__
-        newfunc.__scope__ = d
-        return newfunc

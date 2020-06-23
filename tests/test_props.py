@@ -1,8 +1,19 @@
 import time
 import wrappingpaper as wp
 
+class propobj(wp.propobject):
+    def asdf(self):
+        return self.method(self.instance.other_value)
+
+    @property
+    def blah(self):
+        return self.method(self.instance.other_value) + self.instance.some_value
+
 
 class A:
+    some_value = 10
+    other_value = 11
+
     @wp.cachedproperty
     def x(self):
         return time.time()
@@ -22,6 +33,10 @@ class A:
     @wp.overridable_method
     def on_done(self, x):
         return x
+
+    @propobj
+    def someprop(self, x=None):
+        return (x or self.some_value) * 2
 
 
 def test_cached_once_properties():
@@ -69,3 +84,9 @@ def test_overridable_method():
 
     a.on_done.reset()
     assert a.on_done(x) == x
+
+def test_propobj():
+    a = A()
+    assert a.someprop() == 20
+    assert a.someprop.asdf() == 22
+    assert a.someprop.blah == 22+10

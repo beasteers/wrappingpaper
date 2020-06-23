@@ -74,7 +74,6 @@ class _ContextDecorator(contextlib._GeneratorContextManager):
             raise RuntimeError("generator didn't yield") from None
 
     def __call__(self, func):
-        print(456456, func, self.caller)
         if callable(self.caller):
             return self.caller(func, *self.a, **self.kw)
 
@@ -84,3 +83,18 @@ class _ContextDecorator(contextlib._GeneratorContextManager):
                 return func(*a, **kw)
             return self.default_value
         return wrapper
+
+
+# class _Skip(Exception):
+#     pass
+#
+# def contextflag(obj, name, value=True, default=None):
+#     @contextmanager
+#     def inner(value):
+#         try:
+#             notset = setattr(obj, name) != value
+#             setattr(obj, name, value)
+#             yield notset
+#         finally:
+#             setattr(obj, name, default)
+#     return inner
