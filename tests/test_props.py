@@ -3,11 +3,13 @@ import wrappingpaper as wp
 
 class propobj(wp.propobject):
     def asdf(self):
-        return self.method(self.instance.other_value)
+        return self.__method__(self.__instance__.other_value)
 
     @property
     def blah(self):
-        return self.method(self.instance.other_value) + self.instance.some_value
+        return (
+            self.__method__(self.__instance__.other_value) +
+            self.__instance__.some_value)
 
 
 class A:
@@ -90,3 +92,6 @@ def test_propobj():
     assert a.someprop() == 20
     assert a.someprop.asdf() == 22
     assert a.someprop.blah == 22+10
+    assert a.someprop.__instance__ is a
+    assert a.someprop.__owner__ is A
+    assert a.someprop.__target__ is a

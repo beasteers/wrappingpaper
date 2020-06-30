@@ -15,6 +15,21 @@ def test_dictproxy():
     assert b == {'b': 8, 'c': 10}
 
 
+def test_attrdict():
+    x = wp.attrdict({
+        'a': 5,
+        'b': {'c': 6, 'd': 7}
+    }, {'b': {'e': 10}, 'c': {'e': 10}})
+
+    assert 'a' in x and 'b' in x
+    assert x.a == 5
+    assert isinstance(x.b, wp.attrdict)
+    assert x.b.c == 6
+    assert x.b.d == 7
+    assert x.b.e == 10
+    assert x.c.e == 10
+
+
 def test_namespace():
     class something(metaclass=wp.namespace):
         a = 5
@@ -23,6 +38,8 @@ def test_namespace():
             return a + b
 
     assert something.asdf() == 5+6
+    print(dict(**something))
+    assert dict(**something) == {'a': 5, 'b': 6, 'asdf': something.asdf}
 
 # def test_mask():
 #     class A:
@@ -69,6 +86,19 @@ def test_namespace():
 #     # new attribute not added to original
 #     x.s = 3
 #     assert not hasattr(a, 's')
+
+
+def test_subclasses():
+    class A:
+        pass
+    class B(A):
+        pass
+    class C(A):
+        pass
+    class D(C):
+        pass
+
+    assert wp.all_subclasses(A) == {B, C, D}
 
 
 def test_copyobject():

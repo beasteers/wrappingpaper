@@ -39,13 +39,23 @@ def filterkw(func):
 def filterpos(func):
     '''Remove arguments that aren't in the function signature.'''
     spec = get_argspec(func)
-    print(spec)
     if spec.vararg:
         return func
 
     @functools.wraps(func)
     def inner(*a, **kw):
         return func(*a[:len(spec.posargs)], **kw)
+    return inner
+
+
+def assign_args(func):
+    '''Assign specified arguments in __init__ to self.'''
+    spec = get_argspec(func)
+    @functools.wraps(func)
+    def inner(self, *a, **kw):
+        self.__dict__.update(dict(zip(spec.args, a)))
+        self.__dict__.update({k: kw[k] for k in spec.kwargs if k in kw})
+        return func(self, *a, **kw)
     return inner
 
 
@@ -124,7 +134,7 @@ class configfunction:
             self.config.maps.append(d)
         return self
 
-    def set(self, cfg):
+    def set(self, *cfg):
         for d in cfg[::-1]:
             self.config.maps.insert(0, d)
         return self

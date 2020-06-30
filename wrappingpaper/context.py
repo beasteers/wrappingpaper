@@ -3,6 +3,22 @@ import contextlib
 import wrappingpaper as wp
 
 
+class cmbase:
+    def open(self):
+        return self
+
+    def close(self):
+        return self
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+
 def contextdecorator(func):
     '''Like contextlib.contextmanager, but the wrapped function also
     doubles as a decorator.
@@ -83,6 +99,38 @@ class _ContextDecorator(contextlib._GeneratorContextManager):
                 return func(*a, **kw)
             return self.default_value
         return wrapper
+
+
+
+def contextfunc(func):
+    '''
+    @contextfunc
+    def reset():
+        obj.value = old_value
+
+    @reset.undo
+    def restore():
+        obj.value = new_value
+
+    with obj.reset(): # reset temporarily
+         pass
+
+    obj.reset() # reset permanently
+    '''
+    inner._return = None
+    def inner(*a, **kw):
+        inner._return = func(*a, **kw)
+        return inner._return
+
+    inner.__enter__ = lambda: inner._return
+    inner.__exit__ = lambda: inner.undo()
+
+    def undo(func=None):
+        if callable(func):
+            inner.undo = func
+            return func
+    inner.undo = undo
+
 
 
 # class _Skip(Exception):

@@ -1,4 +1,10 @@
-EMPTY = object()
+class _Null:
+    def __bool__(self):
+        return False
+    __nonzero__ = __bool__
+
+_ = UNSET = EMPTY = UNDEFINED = _Null()
+
 
 from .exceptions import *
 from .iters import *

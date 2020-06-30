@@ -7,6 +7,15 @@ from .exceptions import CircularReference
 Exc = Exception
 
 
+def castoutput(cast):
+    def outer(func):
+        @wraps(func)
+        def inner(*a, **kw):
+            return cast(func(*a, **kw))
+        return inner
+    return outer
+
+
 @contextdecorator
 def ignore(exc=Exc):
     '''Ignore exception raised.'''

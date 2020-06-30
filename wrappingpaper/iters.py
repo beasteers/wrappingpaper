@@ -1,4 +1,5 @@
 import time
+import functools
 import itertools
 
 
@@ -18,6 +19,14 @@ def infinite(i=0, inc=1):
     while True:
         yield i
         i += inc
+
+done = object()
+def until(it):
+    '''Mimic a while loop.'''
+    for x in it:
+        if x is done:
+            break
+        yield x
 
 
 def _throttled(secs=1):
@@ -97,3 +106,54 @@ def run_iter_forever(get_iter, none_if_empty=None, throttle=None, timeout=None):
 #         return True
 #     check.t0 = time.time()
 #     return check
+
+def _trigger_load(func):
+    @functools.wraps(func)
+    def inner(self, *a, **kw):
+        if self._iterable is not None:
+            self.extend(self._iterable)
+            self._iterable = None
+        return func(self, *a, **kw)
+    return inner
+
+class lazylist(list):
+    def __init__(self, iterable):
+        self._iterable = iterable
+        super().__init__()
+
+    __len__ = _trigger_load(list.__len__)
+    __contains__ = _trigger_load(list.__contains__)
+    __getitem__ = _trigger_load(list.__getitem__)
+    __setitem__ = _trigger_load(list.__setitem__)
+    __delitem__ = _trigger_load(list.__delitem__)
+    __add__ = _trigger_load(list.__add__)
+    __iadd__ = _trigger_load(list.__iadd__)
+    __mul__ = _trigger_load(list.__mul__)
+    __imul__ = _trigger_load(list.__imul__)
+    __reversed__ = _trigger_load(list.__reversed__)
+    append = _trigger_load(list.append)
+    extend = _trigger_load(list.extend)
+    copy = _trigger_load(list.copy)
+    count = _trigger_load(list.count)
+    index = _trigger_load(list.index)
+    insert = _trigger_load(list.insert)
+    pop = _trigger_load(list.pop)
+    remove = _trigger_load(list.remove)
+    reverse = _trigger_load(list.reverse)
+    sort = _trigger_load(list.sort)
+
+    # def __mul__(self, other):
+    #     if self._iterable is not None:
+    #         self._iterable = (
+    #             x for xs in itertools.repeat(self._iterable, other) for x in xs)
+    #     return super().__mul__(other)
+    #
+    # def __rmul__(self, other):
+    #     return other.__mul__(self)
+
+    # def insert(self, pos, element):
+    #     if super().__len__() <
+
+    def clear(self):
+        self._iterable = None
+        return super().clear()

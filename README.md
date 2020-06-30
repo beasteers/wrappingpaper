@@ -6,15 +6,15 @@ A collection of Python decorators and utilities to abstract away common/tedious 
 
 This package is more about providing interesting abstractions and trying to flesh out the possibilities of Python code organization. I am in no way saying that using these functions will provide "good" code and I am in no way condoning their use for creating evil Python code ;).
 
-Some of the functions in here may incentivize less understandable code, but that's okay. I want to give them space to exist and hopefully we can develop them further to where they will be more understandable and provide more intuitive abstractions.
+Some of the functions in here may incentivize less understandable code, but that's okay. I want to give them space to exist and hopefully we can develop them further to where they will be more understandable and provide more intuitive and familiar abstractions.
 
-This package is about experimentation and trying to create basic, interesting, natural feeling, and convenient abstractions while sidelining the scrutiny of stuck-up Python purists :stuck_out_tongue_closed_eyes:.
+This package is about experimentation and trying to create basic, interesting, natural feeling, and convenient abstractions while sidelining the scrutiny of Python purists, and potentially people with more sense (!!). I want this to try to push the limits of the language to see what other interesting constructs we can facilitate.
 
 So, I guess the motto of this package is to develop freely, but use responsibly. <3
 
 One other thing to note though, some of these don't play nice with linters 😢
 
-#### Example
+#### Simple Example
 ```python
 import wrappingpaper as wp
 
@@ -41,15 +41,27 @@ something()
 ```
 
 #### Includes
+ - [helper modules](#helper-modules)
+    - real implementations of faux imports, meant as case-studies for import mechanic classes provided.
  - [logging / error handling](#logging)
     - catch errors thrown in a function and redirect to logger
  - [context managers](#context-managers)
    - context managers that double as function wrappers
- - [iterables](#iterables)
  - [object properties](#properties)
+    - class and instance caching
+    - dynamic property objects - give properties nested attributes and methods !!
  - [function signature helpers](#function-signature)
+    - override and apply updates to function signatures
+    - filter function arguments that are outside the function schema
+    - partial that actually updates the wrapper
  - [import mechanics](#import-mechanics)
+    - create faux modules and customize how modules are imported (I did some of the confusing bits for us thankfully)
+ - [iterables](#iterables)
+    - includes some basic iterable functions that I've pulled from other projects so I don't have to keep duplicating them everywhere
  - [misc](#misc)
+    - stuff I just haven't sorted. ya know?
+    - retry on exception
+    - check circular references
 
 
 ## Install
@@ -61,6 +73,26 @@ pip install wrappingpaper
 ## Usage
 ```python
 import wrappingpaper as wp
+```
+
+### Helper Modules
+
+These are faux modules that utilize `wrappingpaper`'s [import mechanics](#import-mechanics) to alter modules that are imported from them.
+
+#### lazyimport
+This is a simple implementation of lazy importing using the defined import mechanics.
+
+```python
+from lazyimport import sklearn
+import librosa # sklearn imports will be lazy
+```
+
+#### presets
+This is a re-implimentation of [bmcfee/presets](https://github.com/bmcfee/presets) that includes the import mechanics, instead of having to wrap modules afterwards. I may add a PR to that package, but implementing it here was trivial for the time being and I didn't feel like it was important enough to push it thru the review process.
+
+```python
+from presets import librosa
+librosa.update(sr=44100) # now functions will default to sr=44100
 ```
 
 ### Logging
@@ -273,10 +305,11 @@ assert asdf(b=10, d=1234) == 5+10+7
 
 ```
 
-## Objects
+### Objects
 
+
+#### Monkeypatching
 ```python
-
 class Blah:
     def asdf(self):
         return 10
@@ -288,27 +321,66 @@ def asdf():
     return 11
 
 assert asdf() == 11
+
 asdf.reset() # remove patch
 assert asdf() == 10
+
 asdf.repatch() # re-place the patch
 assert asdf() == 11
-
 ```
 
-## Iterables
+#### Namespace
+```python
+class something(metaclass=wp.namespace):
+    one_thing = 5
+    other_thing = 6
+
+    def blah(x):
+        return one_thing + other_thing + x
+
+assert something.blah(10) == 5+6+10
+```
+
+### Iterables
 
 ```python
+#####################
+# loop breaking
+#####################
+
+items = wp.until(x if x != 7 else wp.done for x in range(10))
+assert list(items) == list(range(0, 6))
+
+
+####################
+# loop throttling
+####################
 
 # make sure that a for loop doesn't go too fast.
 # limit the time one iteration takes.
+t0 = time.time()
+for x in wp.throttled(range(10), 1):
+    print(x)
+assert time.time() - t0 > 10
 
 # limiting the number of iterations to 10.
-# by default it loops infinitely.
-
-for dt, time_asleep in wp.limit(wp.throttled(1), 10):
+# with no iterable passed, it loops infinitely and
+# yields the total yield time and the time it had to sleep.
+for dt, time_asleep in wp.limit(wp.throttled(secs=1), 10):
     print('Iteration took {}s. Had to sleep for {}s.'.format(dt, time_asleep))
     print('-'*10)
 
+################################
+# Use `while True:` in a loop
+################################
+
+for _ in wp.infinite():
+    print('this is gonna be a while...')
+
+
+#########################
+# pre-check an iterable
+#########################
 
 # check the first n items in an iterable, without removing them.
 
@@ -318,21 +390,24 @@ assert items == [0, 1, 2]
 assert list(it) == [0, 1, 2, 3, 4, 5, 6]
 
 
-# repeat and chain iterables infinitely
+###########################################
+# repeat and chain a function infinitely
+###########################################
 
 import random
 
-def get_numbers():
+def get_numbers(): # function returns an iterable
     return [random.random() for _ in range(10)]
+
+
 
 numbers = wp.run_iter_forever(get_numbers)
 # repeat get_numbers() and chain iterable outputs together
 all_numbers = list(wp.limit(numbers, 100))
 assert all(isinstance(x, float) for x in all_numbers)
 
-# repeat and chain infinitely. If no items are returned by a call,
-# instead of the iterable hanging indefinitely waiting for an item,
-# return None.
+# If no items are returned by a call, instead of the iterable hanging
+# indefinitely waiting for an item, return None.
 
 def get_numbers():
     if random.random() > 0.8: # make random breaks
@@ -343,12 +418,6 @@ numbers = wp.run_iter_forever(get_numbers, none_if_empty=True)
 # this SHOULD contain sporadic None's at a multiple of 10
 all_numbers = list(wp.limit(numbers, 5000))
 assert None in all_numbers
-
-
-# A wrappable alternative to `while True:`
-
-for _ in wp.infinite():
-    print('this is gonna be a while...')
 
 ```
 
@@ -376,7 +445,58 @@ from lazyimport import sklearn.model_selection
 sklearn.model_selection.train_test_split() # now it's loaded.
 ```
 
-I'll try to think up another simple example with the actual implementation shown.
+#### Modify a module after it has been imported from your pseudo-module
+```python
+import wrappingpaper as wp
+
+@wp.PseudoImportFinder.modulemodifier
+def my_loader(module):
+    module.sneakything = '......hi'
+
+my_loader.activate('somethingrandom')
+
+# now somewhere else, you can do
+
+from somethingrandom import numpy as np
+
+assert np.sneakything == '......hi'
+```
+#### Wrap a module to modify the module's contents
+```python
+import importlib
+import wrappingpaper as wp
+
+# create the module wrapper that will traverse and modify the module when it is loaded.
+
+class Module(wp.ModuleWrapper):
+    # this is called for each item in the module
+    def _wrapattr(self, attr, value):
+        # do whatever you want with the value
+        if callable(value) and getattr(value, '__doc__', None) is not None:
+            value.__doc__ += '\nI was here.'
+        elif self._is_submodule(value):
+            value = Module(value)
+        # always pass attr and modified value to be set,
+        # otherwise it will be undefined.
+        super()._wrapattr(attr, value)
+
+
+# applies the module wrapper on load
+
+@wp.PseudoImportFinder.moduleloader
+def my_loader(spec):
+    return Module(importlib.util.module_from_spec(spec))
+
+
+# somewhere else (or in the same place. I'm not ur mom), actually use it
+
+with my_loader.activated('somethingrandom'): # activated only inside context
+    from somethingrandom import glob
+
+print(glob.glob.__doc__)
+assert glob.glob.__doc__.endswith('I was here.')
+```
+
 
 ## Misc
 
