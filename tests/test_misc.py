@@ -100,3 +100,12 @@ def test_circular():
         if len(k) < 10:
             asdf(k + 'a')
     asdf('qqq')
+
+
+def test_castoutput():
+    @wp.castoutput(list)
+    def asdf():
+        yield 5
+        yield 6
+
+    assert asdf() == [5, 6]

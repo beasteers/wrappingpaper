@@ -111,12 +111,14 @@ def _trigger_load(func):
     @functools.wraps(func)
     def inner(self, *a, **kw):
         if self._iterable is not None:
-            self.extend(self._iterable)
-            self._iterable = None
+            it, self._iterable = self._iterable, None
+            self.extend(it)
+            self.loaded = True
         return func(self, *a, **kw)
     return inner
 
 class lazylist(list):
+    loaded = False
     def __init__(self, iterable):
         self._iterable = iterable
         super().__init__()

@@ -55,3 +55,25 @@ def test_custom_caller():
         return xs
     assert xyz() == ['xyz', 4, 1, 5]
     assert xyz() == ['xyz', 4, 1, 5, 4, 1, 5]
+
+
+def test_cmbase():
+    c = wp.ContextBase()
+    with c:
+        pass
+
+
+def test_withif():
+    from contextlib import contextmanager
+
+    class Something(Exception):
+        pass
+
+    @contextmanager
+    def raisessmth():
+        raise Something
+
+    with pytest.raises(Something):
+        with raisessmth(): pass
+
+    with wp.withif(), raisessmth(): pass

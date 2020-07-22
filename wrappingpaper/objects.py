@@ -3,6 +3,7 @@ from collections import ChainMap
 import wrappingpaper as wp
 
 class snitch:
+    '''Print which attributes are being accessed.'''
     def __getattribute__(self, k):
         print('snitch ({}.__getattribute__): {}'.format(type(self), k))
         return super().__getattribute__(k)
@@ -45,14 +46,26 @@ class attrdict(dictproxy):
             raise KeyError(name)
 
 
+class Mask:
+    __initialized__ = False
+    __masked__ = __full__ = None
+    def __init__(self, base, d=None, full=False, **kw):
+        self.__dict__.update(**kw)
+        self.__masked__ = base
+        self.__full__ = full
+        self.__initialized__ = True
 
+    def __getattribute__(self, name):
+        if name not in {'__dict__', '__initialized__'}:
+            if self.__initialized__ and name not in self.__dict__:
+                return getattr(self.__masked__, name)
+        return super().__getattribute__(name)
 
-# class Mask:
-#     def __init__(self, base):
-#         self.__class__ = type(
-#             base.__class__.__name__,
-#             (self.__class__, base.__class__), {})
-#         self.__dict__ = dictproxy(self.__dict__, base.__dict__)
+    def __setattr__(self, name, value):
+        if self.__initialized__:
+            if not (self.__full__ or name in self.__dict__):
+                return setattr(self.__masked__, name, value)
+        return super().__setattr__(name, value)
 
 
 def all_subclasses(cls):
@@ -125,6 +138,48 @@ class namespace(type):
 
 
 
+# class pod:
+#     '''A set of objects that move and act together.'''
+#     def __init__(self, objects):
+#         try: # convert generator to list
+#             len(objects)
+#         except TypeError:
+#             objects = list(objects)
+#         self.__objects__ = objects
+#
+#         # set base class
+#         sample = (
+#             next(objects.values()) if isinstance(objects, dict)
+#             else objects[0])
+#         self.__class__ = type(
+#             self.__class__.__name__,
+#             (type(self.__objects__),) + (
+#                 (type(sample),) if sample is not None else ()),
+#         {})
+#
+#     def __str__(self):
+#         return 'Pod({})'.format(self.__objects__)
+#
+#     def __eq__(self, other):
+#         return (self.__objects__ == (
+#             other.__objects__ if isinstance(other, pod) else other))
+#
+#     def apply(self, func, *a, **kw):
+#         if isinstance(self.__objects__, dict):
+#             return pod({
+#                 k: func(v, *a, **kw) for k, v in self.__objects__.items()})
+#         return pod([func(x, *a, **kw) for x in self.__objects__])
+#
+#     def __getattribute__(self, name):
+#         if name not in {'__objects__', 'apply', '__dict__'}:
+#             try:
+#                 return getattr(self.__objects__, name)
+#             except AttributeError:
+#                 pass
+#             return self.apply(getattr, name)
+#         return super().__getattribute__(name)
+
+
 def modfuncglobals(func, *ds, **kw):
     '''Add globals to a function.'''
     dp = dictproxy()
@@ -152,7 +207,9 @@ def unbound(f):
     '''
     self = getattr(f, '__self__', None)
     if self is not None and not isinstance(self, (type, ModuleType)):
-        if hasattr(f, '__func__'):
+        try:
             return f.__func__
-        return getattr(type(f.__self__), f.__name__)
-    raise TypeError('not a bound method')
+        except AttributeError:
+            return getattr(type(f.__self__), f.__name__)
+    return f
+    # raise TypeError('not a bound method')

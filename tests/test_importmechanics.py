@@ -2,7 +2,14 @@ import sys
 import pytest
 import time
 import wrappingpaper as wp
-from contextlib import contextmanager
+
+# untested:
+#   71 BaseImportFinder.modify_spec=True
+#   81-85 BaseImportFinder.exec_module=True
+#   102-104 BaseImportFinder.modulemodifier
+#   109-111 BaseImportFinder.specmodifier
+#   242 NoLoader.get_data
+#   263-264 lazy_loader.exec_module.__getattribute__
 
 
 @wp.contextdecorator
@@ -93,3 +100,45 @@ def test_nested_import():
 
         from testpkg import nested
         assert isinstance(nested, importlib.util._LazyModule)
+
+@remove_added_imports()
+def test_no_import():
+    with wp.blank_import_loader.activated('blanksss'):
+        from blanksss import testpkg
+        assert not hasattr(testpkg, 't')
+
+
+@remove_added_imports()
+def test_blank_mark():
+    with wp.blank_import_loader.activated('blanksss') as blanksss:
+        blanksss.mark('testpkg')
+        import testpkg
+        assert not hasattr(testpkg, 't')
+        blanksss.unmark('testpkg')
+        del sys.modules['testpkg']
+        import testpkg
+        assert hasattr(testpkg, 't')
+
+
+# @remove_added_imports()
+def test_presets():
+    from presets import Preset, preset_loader
+    try:
+        from presets import testpkg
+        print(testpkg)
+        assert isinstance(testpkg, Preset)
+        assert isinstance(testpkg.test_func, wp.configfunction)
+        assert str(testpkg).startswith('<Preset')
+
+        assert testpkg.test_func() == 5
+        testpkg.update(a=6)
+        assert testpkg.test_func() == 6
+        assert testpkg['a'] == 6
+        assert 'a' in testpkg
+        assert list(testpkg.keys()) == ['a']
+        testpkg['a'] = 10
+        assert testpkg['a'] == 10
+        del testpkg['a']
+        assert 'a' not in testpkg
+    finally:
+        preset_loader.deactivate()

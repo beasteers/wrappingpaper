@@ -32,9 +32,9 @@ class A:
     def c(self):
         return self
 
-    @wp.overridable_method
-    def on_done(self, x):
-        return x
+    # @wp.overridable_method
+    # def on_done(self, x):
+    #     return x
 
     @propobj
     def someprop(self, x=None):
@@ -73,19 +73,19 @@ def test_classinstancemethod():
     assert A.c() is A
     assert isinstance(A().c(), A)
 
-def test_overridable_method():
-    a = A()
-
-    x = 5
-    assert a.on_done(x) == x
-
-    @a.on_done._
-    def on_done(x):
-        return x * 2
-    assert a.on_done(x) == x * 2
-
-    a.on_done.reset()
-    assert a.on_done(x) == x
+# def test_overridable_method():
+#     a = A()
+#
+#     x = 5
+#     assert a.on_done(x) == x
+#
+#     @a.on_done._
+#     def on_done(x):
+#         return x * 2
+#     assert a.on_done(x) == x * 2
+#
+#     a.on_done.reset()
+#     assert a.on_done(x) == x
 
 def test_propobj():
     a = A()
@@ -95,3 +95,20 @@ def test_propobj():
     assert a.someprop.__instance__ is a
     assert a.someprop.__owner__ is A
     assert a.someprop.__target__ is a
+
+    from wrappingpaper.props import _prop
+    _prop(lambda: None).__get__(a)
+
+
+def test_flag():
+    class A:
+        should_print = wp.flag(3, skip=8)
+
+    def asdf(x):
+        if A.should_print.dec:
+            return x
+    assert {asdf(x) for x in range(20)} == {0, 8, 16, None}
+    assert bool(A.should_print) == False
+    assert A.should_print.inc == (not bool(A.should_print.n_called % A.should_print.skip))
+    assert sum(bool(A.should_print.dec) for x in range(A.should_print.skip)) == 1
+    assert not A.should_print.dec

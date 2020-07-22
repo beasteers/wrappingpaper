@@ -3,6 +3,7 @@ import itertools
 import collections
 import inspect
 from inspect import Parameter as Pm
+import wrappingpaper as wp
 
 
 POSARG_TYPES = [Pm.POSITIONAL_ONLY, Pm.POSITIONAL_OR_KEYWORD]
@@ -48,15 +49,15 @@ def filterpos(func):
     return inner
 
 
-def assign_args(func):
-    '''Assign specified arguments in __init__ to self.'''
-    spec = get_argspec(func)
-    @functools.wraps(func)
-    def inner(self, *a, **kw):
-        self.__dict__.update(dict(zip(spec.args, a)))
-        self.__dict__.update({k: kw[k] for k in spec.kwargs if k in kw})
-        return func(self, *a, **kw)
-    return inner
+# def assign_args(func):
+#     '''Assign specified arguments in __init__ to self.'''
+#     spec = get_argspec(func)
+#     @functools.wraps(func)
+#     def inner(self, *a, **kw):
+#         self.__dict__.update(dict(zip(spec.args, a)))
+#         self.__dict__.update({k: kw[k] for k in spec.kwargs if k in kw})
+#         return func(self, *a, **kw)
+#     return inner
 
 
 def partial(func, *a, **kw):
@@ -98,14 +99,17 @@ class configfunction:
     '''
     def __init__(self, func, fill_varkw=True, view=None):
         self.function = func
-        self.name = func.__name__
+        self.name = self.__name__ = func.__name__
         self.spec = get_argspec(func)
         functools.update_wrapper(self, func)
 
         self.config = collections.ChainMap()
         self.fill_varkw = fill_varkw
 
-    def __call__(self, *a, _cfg=None, **kw):
+    def __call__(self, *a, **kw):
+        return self.call(*a, **kw)
+
+    def call(self, *a, _cfg=None, **kw):  # so that we can patch it
         a, kw = self.config_args(self.merge_config(_cfg), *a, **kw)
         return self.function(*a, **kw)
 
@@ -140,6 +144,97 @@ class configfunction:
         return self
 
     def clear(self, *a):
-        self.config = (
-            {k: v for k, v in self.config.items() if k not in a} if a else {})
+        if a:
+            for k in a:
+                for m in self.config.maps:
+                    m.pop(k, None)
+        else:
+            self.config = collections.ChainMap()
         return self
+
+
+class FunctionCapture:
+    '''
+
+    cfgcap = wp.FunctionCapture()
+
+    @cfgcap.capture
+    def build_model(inputs=('asdf/asdf',), window_size=5):
+        return
+
+    @cfgcap.capture(called=True, output='run-args.yml')
+    def main(data_dir='data', train_split=0.2):
+        ...
+
+    main(train_split=0.3)  # call captured function
+
+    print(cfgcap.dump())  # outputs
+
+    defaults:
+        build_model:
+            inputs: ['asdf/asdf']
+            window_size: 5
+        main:
+            data_dir: data
+            train_split: 0.2
+
+    called_with:
+        main:
+            train_split: 0.3
+
+
+    '''
+    def __init__(self, skip_types=None):
+        self.functions = {}
+        self.called_args = {}
+        self.skip_types = skip_types
+
+    def capture(self, func=None, called=False, output=False):
+        def inner(func):
+            func2 = self.functions[func.__name__] = configfunction(func)
+
+            @wp.monkeypatch(func2, 'call')
+            def call(*a, **kw):
+                if called:
+                    self._record_called_args(func2, *a, **kw)
+                _ = call.super()
+                if output:
+                    self.save(output)
+                return _
+
+            return func2
+        return inner(func) if callable(func) else inner
+
+    # def main(self, func=None, called=True, output=True):
+    #     return self.capture(func, called=called, output=output)
+
+    def _record_called_args(self, func, *a, **kw):
+        name = func.__name__
+        # get/new previous called arg dict
+        prevargs = self.called_args.get(name)
+        # get called arg dict
+        args = dict(zip(func.spec.posargs, a), **kw)
+        # update recorded args
+        self.called_args[name] = {
+            k: args[k] for k in set(args) & set(prevargs or args)
+            if ((not self.skip_types or isinstance(args[k], self.skip_types))
+                and (prevargs is None or args[k] == prevargs[k])  # XXX: numpy ughhhhh
+               )
+        }
+
+    def save(self, out_file):
+        import yaml
+        with open(out_file, 'w') as f:
+            yaml.safe_dump(self.dump(), f)
+
+    def dump(self):
+        return {
+            'defaults': {
+                name: {
+                    k: v for k, v in func.spec.defaults.items()
+                    if not self.skip_types or isinstance(v, self.skip_types)
+                }
+                for name, func in self.functions.items()
+            },
+            'called_with': self.called_args
+        }

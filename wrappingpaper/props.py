@@ -98,7 +98,15 @@ class propobject:
         return self._store_as_attr(
             instance if instance is not None else owner,
             self.__hidden_name__,
-            lambda: self._new(__instance__=instance, __owner__=owner))
+            lambda: self._bind_instance(instance, owner))
+
+    def _bind_instance(self, instance, owner=None):
+        prop = self._new(__instance__=instance, __owner__=owner)
+        prop.__init_instance__()
+        return prop
+
+    def __init_instance__(self):
+        pass
 
     def _new(self, **kw):
         return wp.copyobject(self, **kw)
@@ -108,11 +116,12 @@ class propobject:
             return self.__method__(*a, **kw)
 
 
-    def _store_as_attr(self, obj, name, get_value):
+    def _store_as_attr(self, obj, name, get_value, check_type=True):
         # check for existing
         if name and obj is not None:
             prop = getattr(obj, name, None)
-            if prop is not None and isinstance(prop, self.__class__):
+            if prop is not None and (
+                    not check_type or isinstance(prop, self.__class__)):
                 return prop
         # set existing
         prop = get_value()
@@ -121,44 +130,72 @@ class propobject:
         return prop
 
 
-class overridable_method(propobject):
+
+# class patchprop(propobject):
+#     '''A settable property where you can override attributes on the child object.
+#     '''
+#     def __init__(self, default=wp.UNSET, **kw):
+#         self.value = default
+#         super().__init__(**kw)
+#
+#     def __init_instance__(self):
+#         self.value = self._get_value()
+#
+#     def __get__(self, instance, owner=None):
+#         if self.value is wp.UNSET:
+#             raise AttributeError # how to get key name ???
+#         return super().__get__(instance, owner)
+#
+#     def __set__(self, instance, value):
+#         self.value = value
+#
+#     def __getattr__(self, name):
+#         return getattr(self.value, name)
+#
+#     def __dir__(self):
+#         return dir(self.value)
+
+
+class flag:
+    '''A
+
+    Example:
+    >>> class A:
+    ...     should_print = flag(2, skip=8)
+
+    >>> def asdf(x):
+    ...     if A.should_print:
+    ...         print('calling asdf with', x)
+    >>> for x in range(20):
+    ...     print(x)
+    calling asdf with 0
+    calling asdf with 8
+    calling asdf with 16
     '''
-    class A:
-        on_call = wp.instancedef('_on_call')
+    def __init__(self, n=1, check=None, skip=None):
+        self.check = check if callable(check) else (
+            lambda flag: flag.count and not flag.n_called % flag.skip)
+        self.count = n
+        self.n_called = 0
+        self.skip = skip or 1
 
-        @wp.instancedef
-        def on_write(self): # default
-            with self:
-                print(0, 1)
+    @property
+    def dec(self):
+        try:
+            if self:
+                self.count = max(0, self.count - 1)
+                return True
+        finally:
+            self.n_called += 1
 
-        def asdf(self):
-            self._on_call()
+    @property
+    def inc(self):
+        self.count += 1
+        return bool(self)
 
-    a = A()
-
-    @a.on_call.define
-    def on_call(self):
-        with self:
-            print(1, 2, 3)
-
-    a.asdf()
-
-    '''
-    def __init__(self, func, **kw):
-        self.name = '_' + func.__name__
-        super().__init__(func, **kw)
-
-    def _(self, func):
-        setattr(self.__target__, self.name, func)
-        return self
-
-    def __call__(self, *a, **kw):
-        obj = self.__target__
-        func = getattr(obj, self.name, None) or self.__method__
-        return func(*a, **kw)
-
-    def reset(self):
-        delattr(self.__target__, self.name)
+    def __bool__(self):
+        return bool(self.check(self))
+    __nonzero__ = __bool__
 
 
 # class jinjaprop(overridable_property):
@@ -178,3 +215,44 @@ class overridable_method(propobject):
 #         if isinstance(value, str):
 #             value = self.env.from_string(value)
 #         return value
+
+
+
+# class overridable_method(propobject):
+#     '''
+#     class A:
+#         on_call = wp.instancedef('_on_call')
+#
+#         @wp.instancedef
+#         def on_write(self): # default
+#             with self:
+#                 print(0, 1)
+#
+#         def asdf(self):
+#             self._on_call()
+#
+#     a = A()
+#
+#     @a.on_call.define
+#     def on_call(self):
+#         with self:
+#             print(1, 2, 3)
+#
+#     a.asdf()
+#
+#     '''
+#     def __init__(self, func, **kw):
+#         self.name = '_' + func.__name__
+#         super().__init__(func, **kw)
+#
+#     def _(self, func):
+#         setattr(self.__target__, self.name, func)
+#         return self
+#
+#     def __call__(self, *a, **kw):
+#         obj = self.__target__
+#         func = getattr(obj, self.name, None) or self.__method__
+#         return func(*a, **kw)
+#
+#     def reset(self):
+#         delattr(self.__target__, self.name)

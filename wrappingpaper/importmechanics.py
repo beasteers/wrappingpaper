@@ -8,6 +8,11 @@ from contextlib import contextmanager
 
 
 class BaseImportFinder(importlib.abc.MetaPathFinder):
+    '''This handles basic import finder activation/deactivation as well as
+    module monkey patching and importer creation utils.
+
+
+    '''
     module_name = None
     def __init__(self, create_module=None, exec_module=None, modify_spec=None, **kw):
         self.create_module = create_module
@@ -35,7 +40,7 @@ class BaseImportFinder(importlib.abc.MetaPathFinder):
         '''Activate the finder temporarily.'''
         try:
             self.activate(name)
-            yield
+            yield self
         finally:
             self.deactivate()
 
@@ -44,7 +49,7 @@ class BaseImportFinder(importlib.abc.MetaPathFinder):
         '''Deactivate the finder temporarily.'''
         try:
             self.deactivate()
-            yield
+            yield self
         finally:
             self.activate()
 
@@ -132,10 +137,12 @@ class PseudoImportFinder(BaseImportFinder):
                      if name == parts[:len(name)]), None)
 
     def mark(self, *names):
+        '''Mark a module as a wrapped module.'''
         for name in names:
             self.wrapped_modules.add(_as_parts(name))
 
     def unmark(self, *names):
+        '''Unmark a module as a wrapped module.'''
         for name in names:
             self.wrapped_modules.remove(_as_parts(name))
 
@@ -177,7 +184,6 @@ class PseudoImportFinder(BaseImportFinder):
             return spec
 
 
-
 class ModuleWrapper(types.ModuleType):
     def __init__(self, module):
         self._module = module
@@ -188,12 +194,14 @@ class ModuleWrapper(types.ModuleType):
 
         @wp.monkeypatch(module.__loader__)
         def exec_module(module):
-            exec_module.super(module)
-            self._wrap(module)
+            exec_module.super(self._module)
+            self._wrap()
 
-    def _wrap(self, module=None):
-        if module is not None:
-            self._module = module
+    # def __str__(self):
+    #     return '<wrapped({})({})>'.format(
+    #         self.__class__.__name__, self._module)
+
+    def _wrap(self):
         # inspect the target module
         for attr, value in inspect.getmembers(self._module):
             self._wrapattr(attr, value)
@@ -209,10 +217,10 @@ class ModuleWrapper(types.ModuleType):
             os.path.commonprefix(
                 [self.modpath, inspect.getfile(value)]) == self.modpath)
 
-    @classmethod
-    def from_existing(cls, name):
-        m = sys.modules[name] = cls(sys.modules[name])
-        return m
+    # @classmethod
+    # def from_existing(cls, name):
+    #     m = sys.modules[name] = cls(sys.modules[name])
+    #     return m
 
 
 

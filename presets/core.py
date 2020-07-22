@@ -21,13 +21,14 @@ class Preset(wp.ModuleWrapper):
 
         super().__init__(module)
 
-
-    def __repr__(self):
+    def __str__(self):
+        print(999, type(self._module))
+        # return f'<prst {super().__repr__()}>'
         return f'<Preset \n\tfor={self._module} \n\tdefaults={self._defaults}>'
-
 
     def _wrapattr(self, attr, value):
         # If it's a function, wrap it in a decorator
+        print(attr, value)
         if callable(value):
             value = self._wrap_func(value)
 
@@ -51,13 +52,6 @@ class Preset(wp.ModuleWrapper):
             'package.\nDefault parameter values described in the '
             'documentation below may be inaccurate.\n\n{}'.format(wrapped.__doc__))
         return wrapped
-
-    def _is_submodule(self, value):
-        return (
-            isinstance(value, types.ModuleType) and
-            hasattr(value, '__file__') and
-            os.path.commonprefix(
-                [self.modpath, inspect.getfile(value)]) == self.modpath)
 
     def __getitem__(self, param):
         return self._defaults[param]
