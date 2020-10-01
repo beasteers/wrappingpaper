@@ -12,6 +12,7 @@ from .misc import *
 from .context import *
 from .logs import *
 from .props import *
+from . import text
 from .stack import *
 from .objects import *
 from .schedule import *

@@ -58,7 +58,13 @@ class Mask:
     def __getattribute__(self, name):
         if name not in {'__dict__', '__initialized__'}:
             if self.__initialized__ and name not in self.__dict__:
-                return getattr(self.__masked__, name)
+                value = getattr(self.__masked__, name)
+                if hasattr(value, '__self__'):
+                    try:
+                        return value.__func__.__get__(self)
+                    except AttributeError:
+                        pass
+                return value
         return super().__getattribute__(name)
 
     def __setattr__(self, name, value):

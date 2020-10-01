@@ -152,9 +152,7 @@ class PseudoImportFinder(BaseImportFinder):
         parts = _as_parts(fullname)
 
         # e.g. from presets import librosa  <<<<
-        explicit_import = (
-            self.module_name[:len(parts)] ==
-            parts[:len(self.module_name)])
+        explicit_import = self.module_name[:len(parts)] == parts[:len(self.module_name)]
 
         if explicit_import:
             parts = parts[len(self.module_name):] # cut off prefix

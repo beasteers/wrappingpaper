@@ -100,10 +100,19 @@ def test_mask():
         x = 5
         y = 6
 
+        def getx(self):
+            return self.x
+
+        @property
+        def xx(self):
+            return self.x
+
     a = B()
     x = wp.Mask(a, x=10)
     # test that mask is applied
     assert a.x == 5 and x.x == 10
+    assert x.getx() == 10
+    # assert x.xx == 10
     # test partial mask - mask change
     x.y = 8
     assert a.y == 8 and x.y == 8
